@@ -16,8 +16,8 @@ use std::str;
 
 use std::cmp::min;
 use std::io;
-use std::io::{Command, IoError, EndOfFile};
-use std::io::process::InheritFd;
+use std::io::{Command, IoError, EndOfFile, BrokenPipe};
+use std::io::process::{InheritFd, ExitStatus, ExitSignal};
 
 use sha256::{Sha256, Digest};
 mod sha256;
@@ -54,73 +54,91 @@ fn strip_dir(fullname: &str) -> String {
 }
 
 fn reliable_encap() {
-	let args = os::args();
-	if args.len() < 2 {
-		reliable_encap_print_usage(args.get(0).as_slice(), []);
-	}
-	
-	let mut command = Command::new(args.get(1).as_slice());
+    let args = os::args();
+    if args.len() < 2 {
+        reliable_encap_print_usage(args.get(0).as_slice(), []);
+    }
+    
+    let mut command = Command::new(args.get(1).as_slice());
     for i in range(2, args.len()) {
-		command.arg(args.get(i).as_slice());
-	}
-	command.stdin(InheritFd(0));  // Better way to do this?
+        command.arg(args.get(i).as_slice());
+    }
+    command.stdin(InheritFd(0));  // Better way to do this?
     
 
-	let mut process = match command.spawn() {
-		Ok(p) => p,
-		Err(e) => fail!("failed to execute process: {}", e),
-	};
-
-	let mut output = io::stdout();
-	let mut child_output = process.stdout.get_mut_ref();
-	let max_read_len = 32 * 1024;
-	
-	let mut buf: Vec<u8> = Vec::with_capacity(max_read_len);
-	let mut piece_pos: uint = 0u; 
-	let mut hasher: Box<Digest> = box Sha256::new();
-	output.write(MAGIC_HEADER.as_bytes());
-	loop {
-		let n = match child_output.push(PIECE_SIZE, &mut buf) {
-			Ok(n) => {
-				{
-					let out_slice = buf.as_slice();
-					output.write_be_u32(buf.len() as u32);
-					output.write(out_slice);
-					hasher.input(out_slice);
-					output.write(hasher.result_bytes().as_slice());
-				}
-				buf.clear();
-				piece_pos += n;
-			},
-			Err(IoError { kind: EndOfFile, .. }) => {
-				output.write_be_u32(0);
-				output.write(hasher.result_bytes().as_slice());
-				hasher.input(MAGIC_HEADER.as_bytes());
-				output.write(hasher.result_bytes().as_slice());
-				break;
-			},
-			Err(err) => fail!("{}", err)
-			// where are the non-EndOfFile errors??
-			// rustc says I can't handle them here
-		};
+    let mut process = match command.spawn() {
+        Ok(p) => p,
+        Err(e) => fail!("failed to execute process: {}", e),
     };
+
+    let mut output = io::stdout();
+    let max_read_len = 32 * 1024;
+    
+    let mut buf: Vec<u8> = Vec::with_capacity(max_read_len);
+    let mut piece_pos: uint = 0u; 
+    let mut hasher: Box<Digest> = box Sha256::new();
+    output.write(MAGIC_HEADER.as_bytes());
+
+    /* appease borrow checker */ {
+        let mut child_output = process.stdout.get_mut_ref();
+        loop {
+            let n = match child_output.push(PIECE_SIZE, &mut buf) {
+                // Don't forget to import the different IoError kinds
+                // if you are going to catch them.  Otherwise you'll get
+                // an E0001 unreachable pattern.
+                Ok(n) => {
+                    /* appease borrow checker */ {
+                        let out_slice = buf.as_slice();
+                        output.write_be_u32(buf.len() as u32);
+                        output.write(out_slice);
+                        hasher.input(out_slice);
+                        output.write(hasher.result_bytes().as_slice());
+                    }
+                    buf.clear();
+                    piece_pos += n;
+                },
+                Err(IoError { kind: EndOfFile, .. }) => {
+                    output.write_be_u32(0);
+                    output.write(hasher.result_bytes().as_slice());
+                    break;
+                },
+                Err(err) => fail!("{}", err)
+            };
+        };
+    }
+    match process.wait() {
+        Ok(ExitStatus(0)) => {
+            hasher.input(MAGIC_HEADER.as_bytes());
+            output.write(hasher.result_bytes().as_slice());
+            output.flush();
+        },
+        Ok(ExitStatus(n)) => {
+            os::set_exit_status(n);
+        },
+        Ok(ExitSignal(s)) => {
+            os::set_exit_status(1);
+        },
+        Err(e) => {
+            os::set_exit_status(1);
+        }
+    }
 }
 
 fn reliable_encap_print_usage(program: &str, _opts: &[OptGroup]) {
-	println!("reliable_encap_print_usage");
+    println!("reliable_encap_print_usage");
 }
 
 fn reliable_write() {
-	println!("reliable_write");
-	let args = os::args();
+    println!("reliable_write");
+    let args = os::args();
 }
 
 fn reliable_write_print_usage(program: &str, _opts: &[OptGroup]) {
-	println!("reliable_write_print_usage");
+    println!("reliable_write_print_usage");
 }
 
 fn print_usage() {
-	println!("print_usage");
+    println!("print_usage");
 }
 
 fn main() {

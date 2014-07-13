@@ -14,11 +14,9 @@ I needed a way to guarantee streamed file writes to a remote server either
 completed or failed without leaving files on disk.
 
 ## Current State
-This project is definitely not ready for use.  Neither `reliable-encap` or
-`reliable-write` are sufficiently implemented to provide the target guarantees.
-
-* `reliable-encap` serialises a correct bytestream in the absence of failures
-* `reliable-write` does not
+Might be ready to use for serialisation.  `reliable-write` is currently unimplemented.
+* `reliable-encap` serialises a correct bytestream, even under failure conditions
+* `reliable-write` is not implemented
 * No library yet
 
 ## License
