@@ -98,20 +98,18 @@ fn reliable_encap() {
     /* appease borrow checker */ {
         let child_output = process.stdout.get_mut_ref();
         loop {
+            buf.clear();
             match child_output.push(PIECE_SIZE, &mut buf) {
                 // Don't forget to import the different IoError kinds
                 // if you are going to catch them.  Otherwise you'll get
                 // an E0001 unreachable pattern.
                 Ok(n) => {
-                    /* appease borrow checker */ {
-                        let out_slice = buf.as_slice();
-                        assert!(buf.len() == n);
-                        assert!(output.write_be_u32(n as u32).is_ok());
-                        assert!(output.write(out_slice).is_ok());
-                        hasher.input(out_slice);
-                        assert!(output.write(hasher.result_bytes().as_slice()).is_ok());
-                    }
-                    buf.clear();
+                    let out_slice = buf.as_slice();
+                    assert!(buf.len() == n);
+                    assert!(output.write_be_u32(n as u32).is_ok());
+                    assert!(output.write(out_slice).is_ok());
+                    hasher.input(out_slice);
+                    assert!(output.write(hasher.result_bytes().as_slice()).is_ok());
                 },
                 Err(IoError { kind: EndOfFile, .. }) => {
                     assert!(output.write_be_u32(0).is_ok());
@@ -157,8 +155,31 @@ fn reliable_write() {
     let program_name = args.get(0).as_slice().clone();
     if args.len() < 2 {
         reliable_write_print_usage(program_name);
+        os::set_exit_status(1);
+        return;
     }
-     
+
+    let mut buf: Vec<u8> = Vec::with_capacity(MAX_PIECE_SIZE);
+    let mut input = io::stdin();
+
+    // input.read MAGIC_HEADER.len() and compare to MAGIC_HEADER
+
+    loop {
+        match input.read_be_u32() {
+            Ok(n) => {
+                let n = n as uint;
+                if MAX_PIECE_SIZE < n {
+                    fail!("excessive piece size");
+                }
+                if n == 0 {
+                    // Terminating
+                    break;
+                }
+                input.push_at_least(n as uint, MAX_PIECE_SIZE, &mut buf);
+            },
+            Err(err) => fail!("{}", err)
+        }
+    }
 }
 
 fn reliable_write_print_usage(program: &str) {

@@ -18,6 +18,7 @@ Might be ready to use for serialisation.  `reliable-write` is currently unimplem
 * `reliable-encap` serialises a correct bytestream, even under failure conditions
 * `reliable-write` is not implemented
 * No library yet
+* Probably doesn't terminate properly
 
 ## License
 Distributed under the same terms as the Rust project (dual licensed MIT and Apache 2)

@@ -12,7 +12,7 @@ reliable-encap: reliable-rw
 
 
 reliable-rw: reliable_rw.rs
-	rustc -o reliable-rw reliable_rw.rs
+	rustc -O -o reliable-rw reliable_rw.rs
 
 
 clean:
