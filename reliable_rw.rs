@@ -7,25 +7,21 @@
 // except according to those terms.
 
 #![feature(macro_rules)]
-extern crate getopts;
 extern crate debug;
 
-use getopts::{optopt,optflag,getopts,OptGroup};
 use std::os;
-use std::str;
-
-use std::cmp::min;
 use std::io;
-use std::io::{Command, IoError, EndOfFile, BrokenPipe};
+use std::io::{Command, IoError, EndOfFile};
 use std::io::process::{InheritFd, ExitStatus, ExitSignal};
 
 use sha256::{Sha256, Digest};
 mod sha256;
 
-static MAGIC_HEADER: &'static str = "reliable-encap";
+static MAGIC_HEADER: &'static [u8] = b"reliable-encap";
 
 // We won't accept any pieces longer than this
 static MAX_PIECE_SIZE: uint = 256 * 1024;  // 256kB
+
 
 // We won't emit any pieces longer than this
 static PIECE_SIZE: uint = 32 * 1024;  // 32kB
@@ -55,17 +51,38 @@ fn strip_dir(fullname: &str) -> String {
 
 fn reliable_encap() {
     let args = os::args();
+    let program_name = args.get(0).as_slice().clone();
     if args.len() < 2 {
-        reliable_encap_print_usage(args.get(0).as_slice(), []);
-    }
+        reliable_encap_print_usage(program_name);
+        os::set_exit_status(1);
+        return;
+    }    
+
+    let mut cmd_args: &[String] = args.tail();
     
-    let mut command = Command::new(args.get(1).as_slice());
-    for i in range(2, args.len()) {
-        command.arg(args.get(i).as_slice());
+    let head = cmd_args.get(0);
+    if head.is_some() && head.unwrap().as_slice() == "--" {
+        cmd_args = cmd_args.tail();
+    } else {
+        let mut stderr = io::stderr();
+        let warning = "Warning: please include -- before the command name\n";
+        assert!(stderr.write(warning.as_bytes()).is_ok());
+    }
+
+    let head = cmd_args.get(0);
+    if head.is_none() {
+        reliable_encap_print_usage(program_name);
+        os::set_exit_status(1);
+        return;
+    }
+
+    let child_executable = head.unwrap(); 
+    let mut command = Command::new(child_executable.as_slice());
+    for arg in cmd_args.tail().iter() {
+        command.arg(arg.as_slice());
     }
     command.stdin(InheritFd(0));  // Better way to do this?
     
-
     let mut process = match command.spawn() {
         Ok(p) => p,
         Err(e) => fail!("failed to execute process: {}", e),
@@ -75,31 +92,30 @@ fn reliable_encap() {
     let max_read_len = 32 * 1024;
     
     let mut buf: Vec<u8> = Vec::with_capacity(max_read_len);
-    let mut piece_pos: uint = 0u; 
     let mut hasher: Box<Digest> = box Sha256::new();
-    output.write(MAGIC_HEADER.as_bytes());
+    assert!(output.write(MAGIC_HEADER).is_ok());
 
     /* appease borrow checker */ {
-        let mut child_output = process.stdout.get_mut_ref();
+        let child_output = process.stdout.get_mut_ref();
         loop {
-            let n = match child_output.push(PIECE_SIZE, &mut buf) {
+            match child_output.push(PIECE_SIZE, &mut buf) {
                 // Don't forget to import the different IoError kinds
                 // if you are going to catch them.  Otherwise you'll get
                 // an E0001 unreachable pattern.
                 Ok(n) => {
                     /* appease borrow checker */ {
                         let out_slice = buf.as_slice();
-                        output.write_be_u32(buf.len() as u32);
-                        output.write(out_slice);
+                        assert!(buf.len() == n);
+                        assert!(output.write_be_u32(n as u32).is_ok());
+                        assert!(output.write(out_slice).is_ok());
                         hasher.input(out_slice);
-                        output.write(hasher.result_bytes().as_slice());
+                        assert!(output.write(hasher.result_bytes().as_slice()).is_ok());
                     }
                     buf.clear();
-                    piece_pos += n;
                 },
                 Err(IoError { kind: EndOfFile, .. }) => {
-                    output.write_be_u32(0);
-                    output.write(hasher.result_bytes().as_slice());
+                    assert!(output.write_be_u32(0).is_ok());
+                    assert!(output.write(hasher.result_bytes().as_slice()).is_ok());
                     break;
                 },
                 Err(err) => fail!("{}", err)
@@ -108,37 +124,49 @@ fn reliable_encap() {
     }
     match process.wait() {
         Ok(ExitStatus(0)) => {
-            hasher.input(MAGIC_HEADER.as_bytes());
-            output.write(hasher.result_bytes().as_slice());
-            output.flush();
+            hasher.input(MAGIC_HEADER);
+            match output.write(hasher.result_bytes().as_slice()) {
+                Ok(_) => (),
+                Err(err) => fail!("{}", err)
+            }
+            // At this point, even if we fail, the write is complete.
+            match output.flush() {
+                Ok(_) => (),
+                Err(err) => fail!("{}", err)
+            }
         },
         Ok(ExitStatus(n)) => {
             os::set_exit_status(n);
         },
-        Ok(ExitSignal(s)) => {
+        Ok(ExitSignal(_)) => {
             os::set_exit_status(1);
         },
-        Err(e) => {
+        Err(_) => {
             os::set_exit_status(1);
         }
     }
 }
 
-fn reliable_encap_print_usage(program: &str, _opts: &[OptGroup]) {
-    println!("reliable_encap_print_usage");
+fn reliable_encap_print_usage(program: &str) {
+    println!("{} [--] command", program);
 }
 
 fn reliable_write() {
-    println!("reliable_write");
     let args = os::args();
+
+    let program_name = args.get(0).as_slice().clone();
+    if args.len() < 2 {
+        reliable_write_print_usage(program_name);
+    }
+     
 }
 
-fn reliable_write_print_usage(program: &str, _opts: &[OptGroup]) {
-    println!("reliable_write_print_usage");
+fn reliable_write_print_usage(program: &str) {
+    println!("{} filename", program);
 }
 
 fn print_usage() {
-    println!("print_usage");
+    println!("must be called as either reliable-encap or reliable-write");
 }
 
 fn main() {

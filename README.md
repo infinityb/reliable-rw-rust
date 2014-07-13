@@ -5,7 +5,7 @@ reliable-rw
 
 Currently compatible with the Python implementation.
 
-    reliable-encap cat somefile | ssh somehost reliable-write somefile
+    reliable-encap -- cat somefile | ssh somehost reliable-write somefile
 
 
 ## Why does this exist?
