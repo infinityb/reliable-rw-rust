@@ -60,7 +60,11 @@ fn reliable_encap() {
 	}
 	
 	let mut command = Command::new(args.get(1).as_slice());
+    for i in range(2, args.len()) {
+		command.arg(args.get(i).as_slice());
+	}
 	command.stdin(InheritFd(0));  // Better way to do this?
+    
 
 	let mut process = match command.spawn() {
 		Ok(p) => p,
