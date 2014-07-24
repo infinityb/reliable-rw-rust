@@ -2,23 +2,27 @@
 all: reliable-write reliable-encap
 
 
-
-reliable-write: reliable-rw
-	cp -f $< $@
-
-
-reliable-encap: reliable-rw
-	cp -f $< $@
+reliable-write: reliable_write.rs reliable_rw_common.rs sha256.rs
+	rustc -O -o reliable-write reliable_write.rs
 
 
-reliable-rw: reliable_rw.rs
-	rustc -O -o reliable-rw reliable_rw.rs
+reliable-encap: reliable_encap.rs reliable_rw_common.rs sha256.rs
+	rustc -O -o reliable-encap reliable_encap.rs
 
 
 clean:
-	rm reliable-rw reliable-encap reliable-write
+	rm -f reliable-encap reliable-write
 
 
-test:
-	rustc --test -o reliable_rw_test reliable_rw.rs
-	./reliable_rw_test
+reliable-encap_test: reliable_encap.rs reliable_rw_common.rs sha256.rs
+	rustc --test -o reliable-encap_test reliable_encap.rs
+
+
+reliable-rw_test: reliable_write.rs reliable_rw_common.rs sha256.rs
+	rustc --test -o reliable-rw_test reliable_write.rs
+
+
+test: reliable-encap_test reliable-rw_test
+	./reliable-encap_test
+	./reliable-rw_test
+

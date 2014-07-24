@@ -1,5 +1,3 @@
-#![feature(macro_rules)]
-
 // Copyright 2012-2014 The Rust Project Developers. See the COPYRIGHT
 // file at the top-level directory of this distribution and at
 // http://rust-lang.org/COPYRIGHT.
@@ -13,6 +11,10 @@
 //! This module implements only the Sha256 function since that is all that is needed for internal
 //! use. This implementation is not intended for external use or for any use where security is
 //! important.
+
+#![allow(unused_attribute)]
+#![allow(dead_code)]
+
 use std::iter::range_step;
 use std::num::Zero;
 use std::slice::bytes::{MutableByteVector, copy_memory};
@@ -20,23 +22,21 @@ use std::slice::bytes::{MutableByteVector, copy_memory};
 /// Write a u32 into a vector, which must be 4 bytes long. The value is written in big-endian
 /// format.
 fn write_u32_be(dst: &mut[u8], input: u32) {
-    use std::mem::to_be32;
     assert!(dst.len() == 4);
     unsafe {
         let x = dst.unsafe_mut_ref(0) as *mut _ as *mut u32;
-        *x = to_be32(input);
+        *x = input.to_be();
     }
 }
 
 /// Read a vector of bytes into a vector of u32s. The values are read in big-endian format.
 fn read_u32v_be(dst: &mut[u32], input: &[u8]) {
-    use std::mem::to_be32;
     assert!(dst.len() * 4 == input.len());
     unsafe {
         let mut x = dst.unsafe_mut_ref(0) as *mut _ as *mut u32;
         let mut y = input.unsafe_ref(0) as *const _ as *const u32;
         for _ in range(0, dst.len()) {
-            *x = to_be32(*y);
+            *x = (*y).to_be(); // 32(*y);
             x = x.offset(1);
             y = y.offset(1);
         }
