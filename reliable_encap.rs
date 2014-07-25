@@ -72,31 +72,29 @@ fn main() {
     let mut hasher: Box<Digest> = box Sha256::new();
     assert!(output.write(MAGIC_HEADER).is_ok());
 
-    /* appease borrow checker */ {
-        let child_output = process.stdout.get_mut_ref();
-        loop {
-            buf.clear();
-            match child_output.push(PIECE_SIZE, &mut buf) {
-                // Don't forget to import the different IoError kinds
-                // if you are going to catch them.  Otherwise you'll get
-                // an E0001 unreachable pattern.
-                Ok(n) => {
-                    let out_slice = buf.as_slice();
-                    assert!(buf.len() == n);
-                    assert!(output.write_be_u32(n as u32).is_ok());
-                    assert!(output.write(out_slice).is_ok());
-                    hasher.input(out_slice);
-                    assert!(output.write(hasher.result_bytes().as_slice()).is_ok());
-                },
-                Err(IoError { kind: EndOfFile, .. }) => {
-                    assert!(output.write_be_u32(0).is_ok());
-                    assert!(output.write(hasher.result_bytes().as_slice()).is_ok());
-                    break;
-                },
-                Err(err) => fail!("{}", err)
-            };
+    loop {
+        buf.clear();
+        match process.stdout.get_mut_ref().push(PIECE_SIZE, &mut buf) {
+            // Don't forget to import the different IoError kinds
+            // if you are going to catch them.  Otherwise you'll get
+            // an E0001 unreachable pattern.
+            Ok(n) => {
+                let out_slice = buf.as_slice();
+                assert!(buf.len() == n);
+                assert!(output.write_be_u32(n as u32).is_ok());
+                assert!(output.write(out_slice).is_ok());
+                hasher.input(out_slice);
+                assert!(output.write(hasher.result_bytes().as_slice()).is_ok());
+            },
+            Err(IoError { kind: EndOfFile, .. }) => {
+                assert!(output.write_be_u32(0).is_ok());
+                assert!(output.write(hasher.result_bytes().as_slice()).is_ok());
+                break;
+            },
+            Err(err) => fail!("{}", err)
         };
-    }
+    };
+
     match process.wait() {
         Ok(ExitStatus(0)) => {
             hasher.input(MAGIC_HEADER);
