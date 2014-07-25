@@ -7,11 +7,9 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-extern crate debug;
-
 use std::os;
-use std::io::{stdin, File, Open, Write, Reader, Writer};
-use std::io::fs::{rename};
+use std::io::{stdin, File, Open, Write, Reader, Writer, IoResult};
+use std::io::fs::{unlink, rename};
 
 use reliable_rw_common::MAGIC_HEADER;
 use sha256::{Sha256, Digest};
@@ -29,22 +27,20 @@ fn print_usage(program: &str) {
 fn copy_out(
         input: &mut Reader,
         output: &mut Writer
-) -> bool {
+) -> IoResult<()> {
     let mut hasher: Box<Digest> = box Sha256::new();
 
     match input.read_exact(MAGIC_HEADER.len()) {
-        Ok(data) => {
-            println!("data = {:?}", data);
-        },
-        Err(err) => fail!("{}", err)
+        Ok(_) => (),
+        Err(err) => return Err(err)
     }
 
     loop {
         let n = match input.read_be_u32() {
             Ok(n) => {
                 let n = n as uint;
-                println!("n = {}", n);
                 if MAX_PIECE_SIZE < n {
+                    // We won't clean up our temp file if this happens!
                     fail!("excessive piece size, {}", n);
                 }
                 if n == 0 {
@@ -52,24 +48,26 @@ fn copy_out(
                 }
                 n
             },
-            Err(err) => fail!("{}", err)
+            Err(err) => return Err(err)
         };
-        match input.read_exact(n) {
-            Ok(data) => {
-                hasher.input(data.as_slice());
-                assert!(output.write(data.as_slice()).is_ok());
-                println!("data = {:?}", data);
-            },
-            Err(err) => fail!("{}", err)
-        }
-        match input.read_exact(hasher.output_bits() / 8) {
-            Ok(data) => {
-                assert!(data.as_slice() == hasher.result_bytes().as_slice());
-            },
-            Err(err) => fail!("{}", err)
-        }
+        let data = match input.read_exact(n) {
+            Ok(data) => data,
+            Err(err) => return Err(err)
+        };
+
+        hasher.input(data.as_slice());
+        match output.write(data.as_slice()) {
+            Ok(_) => (),
+            Err(err) => return Err(err)
+        };
+
+        let hash_data = match input.read_exact(hasher.output_bits() / 8) {
+            Ok(data) => data,
+            Err(err) => return Err(err)
+        };
+        assert!(hash_data.as_slice() == hasher.result_bytes().as_slice());
     }
-    true
+    Ok(())
 }
 
 fn main() {
@@ -89,10 +87,15 @@ fn main() {
         Ok(f) => f,
         Err(e) => fail!("file error: {}", e),
     };
-    if copy_out(&mut input, &mut output) {
-        match rename(&output_path_tmp, &output_path) {
-            Ok(_) => {},
-            Err(err) => fail!("{}", err)
-        };
+
+    match copy_out(&mut input, &mut output) {
+        Ok(_) => {
+            // is `output' flushed at this point in time?
+            rename(&output_path_tmp, &output_path);
+        },
+        Err(err) => {
+            assert!(unlink(&output_path_tmp).is_ok());        
+            fail!("{}", err);
+        }
     }
 }
