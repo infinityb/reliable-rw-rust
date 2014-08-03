@@ -59,6 +59,7 @@ fn main() {
         command.arg(arg.as_slice());
     }
     command.stdin(InheritFd(0));  // TODO: Better way to do this?
+    command.stderr(InheritFd(2));
 
     let mut process = match command.spawn() {
         Ok(p) => p,

@@ -41,6 +41,7 @@ fn copy_out(
                 let n = n as uint;
                 if MAX_PIECE_SIZE < n {
                     // We won't clean up our temp file if this happens!
+                    // StreamProtocolError
                     fail!("excessive piece size, {}", n);
                 }
                 if n == 0 {
@@ -65,6 +66,7 @@ fn copy_out(
             Ok(data) => data,
             Err(err) => return Err(err)
         };
+        // IntegrityError
         assert!(hash_data.as_slice() == hasher.result_bytes().as_slice());
     }
     Ok(())
