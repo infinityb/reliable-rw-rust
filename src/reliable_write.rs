@@ -8,7 +8,7 @@
 // except according to those terms.
 
 use std::os;
-use std::io::{stdin, File, Open, Write, Reader, Writer, IoResult};
+use std::io::{stdin, stderr, File, Open, Write, Reader, Writer, IoResult};
 use std::io::fs::{unlink, rename};
 
 use reliable_rw_common::MAGIC_HEADER;
@@ -20,8 +20,12 @@ mod reliable_rw_common;
 static MAX_PIECE_SIZE: uint = 256 * 1024;  // 256kB
 
 
-fn print_usage(program: &str) {
-    println!("{} filename", program);
+fn print_usage(program: &[u8]) {
+    let mut stderr = stderr();
+    let mut output = Vec::new();
+    output = output.append(program);
+    output = output.append(b" filename\n");
+    assert!(stderr.write(output.as_slice()).is_ok());
 }
 
 fn copy_out(
@@ -73,7 +77,7 @@ fn copy_out(
 }
 
 fn main() {
-    let args = os::args();
+    let args = os::args_as_bytes();
 
     let program_name = args[0].as_slice().clone();
     if args.len() < 2 {
@@ -93,7 +97,7 @@ fn main() {
     match copy_out(&mut input, &mut output) {
         Ok(_) => {
             // is `output' flushed at this point in time?
-            rename(&output_path_tmp, &output_path);
+            assert!(rename(&output_path_tmp, &output_path).is_ok())
         },
         Err(err) => {
             assert!(unlink(&output_path_tmp).is_ok());        

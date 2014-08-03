@@ -7,6 +7,8 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+extern crate libc;
+
 use std::os;
 use std::io;
 use std::io::{Command, IoError, EndOfFile};
@@ -17,6 +19,7 @@ use sha256::{Sha256, Digest};
 
 mod sha256;
 mod reliable_rw_common;
+
 
 // We won't emit any pieces longer than this
 pub static PIECE_SIZE: uint = 32 * 1024;  // 32kB
@@ -58,8 +61,8 @@ fn main() {
     for arg in cmd_args.tail().iter() {
         command.arg(arg.as_slice());
     }
-    command.stdin(InheritFd(0));  // TODO: Better way to do this?
-    command.stderr(InheritFd(2));
+    command.stdin(InheritFd(libc::STDIN_FILENO));
+    command.stderr(InheritFd(libc::STDERR_FILENO));
 
     let mut process = match command.spawn() {
         Ok(p) => p,
