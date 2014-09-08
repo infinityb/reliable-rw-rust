@@ -5,10 +5,15 @@ authors = [
     "Stacey Ell <stacey.ell@gmail.com>"
 ]
 
+[lib]
+name = "reliable_rw_common"
+path = "src/reliable_rw_common.rs"
+
 
 [[bin]]
 name = "reliable-encap"
 path = "src/reliable_encap.rs"
+
 
 [[bin]]
 name = "reliable-write"

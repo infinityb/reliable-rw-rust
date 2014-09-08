@@ -7,17 +7,19 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+extern crate reliable_rw_common;
+
 use std::os;
-use std::io::{stdin, stderr, File, Open, Write, Reader, Writer, IoResult};
+use std::io::{stdin, stderr, File, Open, Write, Writer};
 use std::io::fs::{unlink, rename};
 
-use reliable_rw_common::MAGIC_HEADER;
-use sha256::{Sha256, Digest};
-
-mod sha256;
-mod reliable_rw_common;
-
-static MAX_PIECE_SIZE: uint = 256 * 1024;  // 256kB
+use reliable_rw_common::{
+    copy_out,
+    IntegrityError,
+    ProtocolError,
+    ReadError,
+    WriteError
+};
 
 
 fn print_usage(program: &[u8]) {
@@ -28,53 +30,6 @@ fn print_usage(program: &[u8]) {
     assert!(stderr.write(output.as_slice()).is_ok());
 }
 
-fn copy_out(
-        input: &mut Reader,
-        output: &mut Writer
-) -> IoResult<()> {
-    let mut hasher: Box<Digest> = box Sha256::new();
-
-    match input.read_exact(MAGIC_HEADER.len()) {
-        Ok(_) => (),
-        Err(err) => return Err(err)
-    }
-
-    loop {
-        let n = match input.read_be_u32() {
-            Ok(n) => {
-                let n = n as uint;
-                if MAX_PIECE_SIZE < n {
-                    // We won't clean up our temp file if this happens!
-                    // StreamProtocolError
-                    fail!("excessive piece size, {}", n);
-                }
-                if n == 0 {
-                    break;
-                }
-                n
-            },
-            Err(err) => return Err(err)
-        };
-        let data = match input.read_exact(n) {
-            Ok(data) => data,
-            Err(err) => return Err(err)
-        };
-
-        hasher.input(data.as_slice());
-        match output.write(data.as_slice()) {
-            Ok(_) => (),
-            Err(err) => return Err(err)
-        };
-
-        let hash_data = match input.read_exact(hasher.output_bits() / 8) {
-            Ok(data) => data,
-            Err(err) => return Err(err)
-        };
-        // IntegrityError
-        assert!(hash_data.as_slice() == hasher.result_bytes().as_slice());
-    }
-    Ok(())
-}
 
 fn main() {
     let args = os::args_as_bytes();
@@ -99,9 +54,21 @@ fn main() {
             // is `output' flushed at this point in time?
             assert!(rename(&output_path_tmp, &output_path).is_ok())
         },
-        Err(err) => {
+        Err(IntegrityError) => {
             assert!(unlink(&output_path_tmp).is_ok());        
-            fail!("{}", err);
-        }
+            fail!("IntegrityError");
+        },
+        Err(ProtocolError) => {
+            assert!(unlink(&output_path_tmp).is_ok());        
+            fail!("ProtocolError");
+        },
+        Err(ReadError(err)) => {
+            assert!(unlink(&output_path_tmp).is_ok());        
+            fail!("ReadError: {}", err);
+        },
+        Err(WriteError(err)) => {
+            assert!(unlink(&output_path_tmp).is_ok());        
+            fail!("WriteError: {}", err);
+        },
     }
 }

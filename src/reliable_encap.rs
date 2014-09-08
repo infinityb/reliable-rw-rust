@@ -1,6 +1,7 @@
 #![feature(macro_rules)]
+#![allow(unused_must_use)]
 // Copyright 2014 Stacey Ell <stacey.ell@gmail.com>
-
+// 
 // Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 // http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
 // <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
@@ -8,26 +9,22 @@
 // except according to those terms.
 
 extern crate libc;
+extern crate reliable_rw_common;
 
 use std::os;
 use std::io;
 use std::io::{Command, IoError, EndOfFile};
 use std::io::process::{InheritFd, ExitStatus, ExitSignal};
-
-use reliable_rw_common::MAGIC_HEADER;
-use sha256::{Sha256, Digest};
-
-mod sha256;
-mod reliable_rw_common;
+use reliable_rw_common::ReliableEncap;
 
 
-// We won't emit any pieces longer than this
 pub static PIECE_SIZE: uint = 32 * 1024;  // 32kB
 
 
 fn print_usage(program: &str) {
     println!("{} [--] command", program);
 }
+
 
 fn main() {
     let args = os::args();
@@ -69,30 +66,24 @@ fn main() {
         Err(e) => fail!("failed to execute process: {}", e),
     };
 
-    let mut output = io::stdout();
     let max_read_len = 32 * 1024;
+    let mut encap_output = io::stdout();
+    let mut encapper = ReliableEncap::new(&mut encap_output);
 
     let mut buf: Vec<u8> = Vec::with_capacity(max_read_len);
-    let mut hasher: Box<Digest> = box Sha256::new();
-    assert!(output.write(MAGIC_HEADER).is_ok());
 
     loop {
         buf.clear();
-        match process.stdout.get_mut_ref().push(PIECE_SIZE, &mut buf) {
+        match process.stdout.as_mut().unwrap().push(PIECE_SIZE, &mut buf) {
             // Don't forget to import the different IoError kinds
             // if you are going to catch them.  Otherwise you'll get
             // an E0001 unreachable pattern.
             Ok(n) => {
-                let out_slice = buf.as_slice();
-                assert!(buf.len() == n);
-                assert!(output.write_be_u32(n as u32).is_ok());
-                assert!(output.write(out_slice).is_ok());
-                hasher.input(out_slice);
-                assert!(output.write(hasher.result_bytes().as_slice()).is_ok());
+                assert_eq!(buf.len(), n);
+                assert!(encapper.update(&buf).is_ok())
             },
             Err(IoError { kind: EndOfFile, .. }) => {
-                assert!(output.write_be_u32(0).is_ok());
-                assert!(output.write(hasher.result_bytes().as_slice()).is_ok());
+                assert!(encapper.finish_write().is_ok())
                 break;
             },
             Err(err) => fail!("{}", err)
@@ -101,16 +92,7 @@ fn main() {
 
     match process.wait() {
         Ok(ExitStatus(0)) => {
-            hasher.input(MAGIC_HEADER);
-            match output.write(hasher.result_bytes().as_slice()) {
-                Ok(_) => (),
-                Err(err) => fail!("{}", err)
-            }
-            // At this point, even if we fail, the write is complete.
-            match output.flush() {
-                Ok(_) => (),
-                Err(err) => fail!("{}", err)
-            }
+            assert!(encapper.finalize().is_ok())
         },
         Ok(ExitStatus(n)) => {
             os::set_exit_status(n);
