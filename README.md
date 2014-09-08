@@ -14,11 +14,10 @@ I needed a way to guarantee streamed file writes to a remote server either
 completed or failed without leaving files on disk.
 
 ## Current State
-Might be ready to use for serialisation.  `reliable-write` is currently unimplemented.
+Might be ready to use.
 * `reliable-encap` serialises a correct bytestream, even under failure conditions
-* `reliable-write` is not implemented
-* No library yet
-* Probably doesn't terminate properly
+* `reliable-write` seems to deserialise the stream robustly
+* Beginning to resemble a library
 
 ## License
 Distributed under the same terms as the Rust project (dual licensed MIT and Apache 2)
