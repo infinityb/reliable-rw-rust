@@ -7,13 +7,13 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-extern crate reliable_rw_common;
+extern crate reliable_rw;
 
 use std::os;
 use std::io::{stdin, stderr, File, Open, Write, Writer};
 use std::io::fs::{unlink, rename};
 
-use reliable_rw_common::{
+use reliable_rw::{
     copy_out,
     IntegrityError,
     ProtocolError,

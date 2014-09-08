@@ -6,8 +6,8 @@ authors = [
 ]
 
 [lib]
-name = "reliable_rw_common"
-path = "src/reliable_rw_common.rs"
+name = "reliable_rw"
+path = "src/reliable_rw.rs"
 
 
 [[bin]]

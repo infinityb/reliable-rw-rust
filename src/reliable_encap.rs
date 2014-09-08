@@ -9,13 +9,12 @@
 // except according to those terms.
 
 extern crate libc;
-extern crate reliable_rw_common;
+extern crate reliable_rw;
 
-use std::os;
-use std::io;
-use std::io::{Command, IoError, EndOfFile};
+use std::os::{args, set_exit_status};
+use std::io::{stdout, stderr, Command, IoError, EndOfFile};
 use std::io::process::{InheritFd, ExitStatus, ExitSignal};
-use reliable_rw_common::ReliableEncap;
+use reliable_rw::ReliableEncap;
 
 
 pub static PIECE_SIZE: uint = 32 * 1024;  // 32kB
@@ -27,11 +26,11 @@ fn print_usage(program: &str) {
 
 
 fn main() {
-    let args = os::args();
+    let args = args();
     let program_name = args[0].as_slice().clone();
     if args.len() < 2 {
         print_usage(program_name);
-        os::set_exit_status(1);
+        set_exit_status(1);
         return;
     }
 
@@ -41,7 +40,7 @@ fn main() {
     if head.is_some() && head.unwrap().as_slice() == "--" {
         cmd_args = cmd_args.tail();
     } else {
-        let mut stderr = io::stderr();
+        let mut stderr = stderr();
         let warning = "Warning: please include -- before the command name\n";
         assert!(stderr.write(warning.as_bytes()).is_ok());
     }
@@ -49,7 +48,7 @@ fn main() {
     let head = cmd_args.get(0);
     if head.is_none() {
         print_usage(program_name);
-        os::set_exit_status(1);
+        set_exit_status(1);
         return;
     }
 
@@ -67,7 +66,7 @@ fn main() {
     };
 
     let max_read_len = 32 * 1024;
-    let mut encap_output = io::stdout();
+    let mut encap_output = stdout();
     let mut encapper = ReliableEncap::new(&mut encap_output);
 
     let mut buf: Vec<u8> = Vec::with_capacity(max_read_len);
@@ -95,13 +94,13 @@ fn main() {
             assert!(encapper.finalize().is_ok())
         },
         Ok(ExitStatus(n)) => {
-            os::set_exit_status(n);
+            set_exit_status(n);
         },
         Ok(ExitSignal(_)) => {
-            os::set_exit_status(1);
+            set_exit_status(1);
         },
         Err(_) => {
-            os::set_exit_status(1);
+            set_exit_status(1);
         }
     }
 }

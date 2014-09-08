@@ -7,7 +7,7 @@
 // except according to those terms.
 #![feature(macro_rules)]
 
-use std::io::{Command, IoResult, IoError};
+use std::io::{IoResult, IoError};
 
 use sha256::{Sha256, Digest};
 mod sha256;
