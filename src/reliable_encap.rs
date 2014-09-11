@@ -67,7 +67,10 @@ fn main() {
 
     let max_read_len = 32 * 1024;
     let mut encap_output = stdout();
-    let mut encapper = ReliableEncap::new(&mut encap_output);
+    let mut encapper = match ReliableEncap::new(&mut encap_output) {
+        Ok(encapper) => encapper,
+        Err(err) => fail!("Error initialising: {}", err)
+    };
 
     let mut buf: Vec<u8> = Vec::with_capacity(max_read_len);
 

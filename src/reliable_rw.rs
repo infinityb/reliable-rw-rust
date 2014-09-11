@@ -42,21 +42,20 @@ pub struct ReliableEncap<'a> {
 
 
 impl<'a> ReliableEncap<'a> {
-    pub fn new<'a>(output: &'a mut Writer) -> ReliableEncap<'a> {
-        ReliableEncap {
+    pub fn new<'a>(output: &'a mut Writer) -> IoResult<ReliableEncap<'a>> {
+        let rv = ReliableEncap {
             is_started: false,
             digest: Sha256::new(),
             output: output
-        }
+        };
+        try!(rv.output.write(MAGIC_HEADER));
+        Ok(rv)
     }
 
     pub fn update(&mut self, buf: &Vec<u8>) -> IoResult<()> {
         if !self.is_started {
-            match self.output.write(MAGIC_HEADER) {
-                Ok(()) => (),
-                Err(err) => return Err(err)
-            }
-            self.is_started = true;
+            println!("what");
+            
         }
 
         match self.output.write_be_u32(buf.len() as u32) {
@@ -93,15 +92,8 @@ impl<'a> ReliableEncap<'a> {
 
     pub fn finalize(&mut self) -> IoResult<()> {
         // self.digest.input(MAGIC_HEADER);
-        match self.output.write(self.digest.result_bytes().as_slice()) {
-            Ok(()) => (),
-            Err(err) => return Err(err)
-        }
-        match self.output.flush() {
-            Ok(()) => (),
-            Err(err) => return Err(err)
-        }
-        Ok(())
+        try!(self.output.write(self.digest.result_bytes().as_slice()));
+        self.output.flush()
     }
 }
 
@@ -150,5 +142,14 @@ pub fn copy_out(input: &mut Reader, output: &mut Writer) -> ReliableWriteResult<
             break;
         }
     }
+    let hash_data = match input.read_exact(hasher.output_bits() / 8) {
+        Ok(data) => data,
+        Err(err) => return Err(ReadError(err))
+    };
+    // IntegrityError
+    if hash_data != hasher.result_bytes() {
+        return Err(IntegrityError);
+    }
+
     Ok(())
 }
