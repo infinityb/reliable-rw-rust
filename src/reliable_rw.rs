@@ -35,7 +35,6 @@ pub type ReliableWriteResult<T> = Result<T, ReliableWriteError>;
 
 
 pub struct ReliableEncap<'a> {
-    is_started: bool,
     digest: Sha256,
     output: &'a mut Writer+'a,
 }
@@ -44,7 +43,6 @@ pub struct ReliableEncap<'a> {
 impl<'a> ReliableEncap<'a> {
     pub fn new<'a>(output: &'a mut Writer) -> IoResult<ReliableEncap<'a>> {
         let rv = ReliableEncap {
-            is_started: false,
             digest: Sha256::new(),
             output: output
         };
@@ -53,11 +51,6 @@ impl<'a> ReliableEncap<'a> {
     }
 
     pub fn update(&mut self, buf: &Vec<u8>) -> IoResult<()> {
-        if !self.is_started {
-            println!("what");
-            
-        }
-
         match self.output.write_be_u32(buf.len() as u32) {
             Ok(()) => (),
             Err(err) => return Err(err)
