@@ -25,8 +25,8 @@ use reliable_rw::{
 fn print_usage(program: &[u8]) {
     let mut stderr = stderr();
     let mut output = Vec::new();
-    output = output.append(program);
-    output = output.append(b" filename\n");
+    output.extend(program.iter().map(|x| x.clone()));
+    output.extend(b" filename\n".iter().map(|x| x.clone()));
     assert!(stderr.write(output.as_slice()).is_ok());
 }
 
