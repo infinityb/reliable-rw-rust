@@ -24,7 +24,7 @@ use std::slice::bytes::{MutableByteVector, copy_memory};
 fn write_u32_be(dst: &mut[u8], input: u32) {
     assert!(dst.len() == 4);
     unsafe {
-        let x = dst.unsafe_mut_ref(0) as *mut _ as *mut u32;
+        let x = dst.as_mut_ptr() as *mut u32;
         *x = input.to_be();
     }
 }
@@ -33,7 +33,7 @@ fn write_u32_be(dst: &mut[u8], input: u32) {
 fn read_u32v_be(dst: &mut[u32], input: &[u8]) {
     assert!(dst.len() * 4 == input.len());
     unsafe {
-        let mut x = dst.unsafe_mut_ref(0) as *mut _ as *mut u32;
+        let mut x = dst.as_mut_ptr() as *mut u32;
         let mut y = input.unsafe_get(0) as *const _ as *const u32;
         for _ in range(0, dst.len()) {
             *x = (*y).to_be(); // 32(*y);
@@ -143,14 +143,14 @@ impl FixedBuffer for FixedBuffer64 {
             let buffer_remaining = size - self.buffer_idx;
             if input.len() >= buffer_remaining {
                     copy_memory(
-                        self.buffer.mut_slice(self.buffer_idx, size),
+                        self.buffer.slice_mut(self.buffer_idx, size),
                         input.slice_to(buffer_remaining));
                 self.buffer_idx = 0;
                 func(self.buffer);
                 i += buffer_remaining;
             } else {
                 copy_memory(
-                    self.buffer.mut_slice(self.buffer_idx, self.buffer_idx + input.len()),
+                    self.buffer.slice_mut(self.buffer_idx, self.buffer_idx + input.len()),
                     input);
                 self.buffer_idx += input.len();
                 return;
@@ -169,7 +169,7 @@ impl FixedBuffer for FixedBuffer64 {
         // be empty.
         let input_remaining = input.len() - i;
         copy_memory(
-            self.buffer.mut_slice(0, input_remaining),
+            self.buffer.slice_mut(0, input_remaining),
             input.slice_from(i));
         self.buffer_idx += input_remaining;
     }
@@ -180,13 +180,13 @@ impl FixedBuffer for FixedBuffer64 {
 
     fn zero_until(&mut self, idx: uint) {
         assert!(idx >= self.buffer_idx);
-        self.buffer.mut_slice(self.buffer_idx, idx).set_memory(0);
+        self.buffer.slice_mut(self.buffer_idx, idx).set_memory(0);
         self.buffer_idx = idx;
     }
 
     fn next<'s>(&'s mut self, len: uint) -> &'s mut [u8] {
         self.buffer_idx += len;
-        return self.buffer.mut_slice(self.buffer_idx - len, self.buffer_idx);
+        return self.buffer.slice_mut(self.buffer_idx - len, self.buffer_idx);
     }
 
     fn full_buffer<'s>(&'s mut self) -> &'s [u8] {
@@ -361,7 +361,7 @@ impl Engine256State {
              )
         )
 
-        read_u32v_be(w.mut_slice(0, 16), data);
+        read_u32v_be(w.slice_mut(0, 16), data);
 
         // Putting the message schedule inside the same loop as the round calculations allows for
         // the compiler to generate better code.
@@ -500,14 +500,14 @@ impl Digest for Sha256 {
 		let mut self_clone = self.clone();
         self_clone.engine.finish();
 
-        write_u32_be(out.mut_slice(0, 4), self_clone.engine.state.h0);
-        write_u32_be(out.mut_slice(4, 8), self_clone.engine.state.h1);
-        write_u32_be(out.mut_slice(8, 12), self_clone.engine.state.h2);
-        write_u32_be(out.mut_slice(12, 16), self_clone.engine.state.h3);
-        write_u32_be(out.mut_slice(16, 20), self_clone.engine.state.h4);
-        write_u32_be(out.mut_slice(20, 24), self_clone.engine.state.h5);
-        write_u32_be(out.mut_slice(24, 28), self_clone.engine.state.h6);
-        write_u32_be(out.mut_slice(28, 32), self_clone.engine.state.h7);
+        write_u32_be(out.slice_mut(0, 4), self_clone.engine.state.h0);
+        write_u32_be(out.slice_mut(4, 8), self_clone.engine.state.h1);
+        write_u32_be(out.slice_mut(8, 12), self_clone.engine.state.h2);
+        write_u32_be(out.slice_mut(12, 16), self_clone.engine.state.h3);
+        write_u32_be(out.slice_mut(16, 20), self_clone.engine.state.h4);
+        write_u32_be(out.slice_mut(20, 24), self_clone.engine.state.h5);
+        write_u32_be(out.slice_mut(24, 28), self_clone.engine.state.h6);
+        write_u32_be(out.slice_mut(28, 32), self_clone.engine.state.h7);
     }
 
     fn reset(&mut self) {
