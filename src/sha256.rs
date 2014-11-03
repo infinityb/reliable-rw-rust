@@ -12,7 +12,7 @@
 //! use. This implementation is not intended for external use or for any use where security is
 //! important.
 
-#![allow(unused_attribute)]
+#![allow(unused_attributes)]
 #![allow(dead_code)]
 
 use std::iter::range_step;
