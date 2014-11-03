@@ -62,14 +62,14 @@ fn main() {
 
     let mut process = match command.spawn() {
         Ok(p) => p,
-        Err(e) => fail!("failed to execute process: {}", e),
+        Err(e) => panic!("failed to execute process: {}", e),
     };
 
     let max_read_len = 32 * 1024;
     let mut encap_output = stdout();
     let mut encapper = match ReliableEncap::new(&mut encap_output) {
         Ok(encapper) => encapper,
-        Err(err) => fail!("Error initialising: {}", err)
+        Err(err) => panic!("Error initialising: {}", err)
     };
 
     let mut buf: Vec<u8> = Vec::with_capacity(max_read_len);
@@ -88,7 +88,7 @@ fn main() {
                 assert!(encapper.finish_write().is_ok())
                 break;
             },
-            Err(err) => fail!("{}", err)
+            Err(err) => panic!("{}", err)
         };
     };
 

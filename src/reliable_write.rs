@@ -46,7 +46,7 @@ fn main() {
     let mut input = stdin();
     let mut output = match File::open_mode(&output_path_tmp, Open, Write) {
         Ok(f) => f,
-        Err(e) => fail!("file error: {}", e),
+        Err(e) => panic!("file error: {}", e),
     };
 
     match copy_out(&mut input, &mut output) {
@@ -55,20 +55,20 @@ fn main() {
             assert!(rename(&output_path_tmp, &output_path).is_ok())
         },
         Err(IntegrityError) => {
-            assert!(unlink(&output_path_tmp).is_ok());        
-            fail!("IntegrityError");
+            assert!(unlink(&output_path_tmp).is_ok());
+            panic!("IntegrityError");
         },
         Err(ProtocolError) => {
-            assert!(unlink(&output_path_tmp).is_ok());        
-            fail!("ProtocolError");
+            assert!(unlink(&output_path_tmp).is_ok());
+            panic!("ProtocolError");
         },
         Err(ReadError(err)) => {
-            assert!(unlink(&output_path_tmp).is_ok());        
-            fail!("ReadError: {}", err);
+            assert!(unlink(&output_path_tmp).is_ok());
+            panic!("ReadError: {}", err);
         },
         Err(WriteError(err)) => {
-            assert!(unlink(&output_path_tmp).is_ok());        
-            fail!("WriteError: {}", err);
+            assert!(unlink(&output_path_tmp).is_ok());
+            panic!("WriteError: {}", err);
         },
     }
 }
