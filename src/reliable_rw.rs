@@ -5,7 +5,7 @@
 // <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
-#![feature(macro_rules)]
+#![feature(macro_rules, slicing_syntax)]
 
 use std::io::{IoResult, IoError};
 
@@ -96,7 +96,7 @@ pub fn copy_out(input: &mut Reader, output: &mut Writer) -> ReliableWriteResult<
 
     match input.read_exact(MAGIC_HEADER.len()) {
         Ok(_) => (),
-        Err(err) => return Err(ReadError(err))
+        Err(err) => return Err(ReliableWriteError::ReadError(err))
     }
 
     loop {
@@ -104,31 +104,30 @@ pub fn copy_out(input: &mut Reader, output: &mut Writer) -> ReliableWriteResult<
             Ok(n) => {
                 let n = n as uint;
                 if MAX_PIECE_SIZE < n {
-                    return Err(ProtocolError);
+                    return Err(ReliableWriteError::ProtocolError);
                 }
                 n
             },
-            Err(err) => return Err(ReadError(err))
+            Err(err) => return Err(ReliableWriteError::ReadError(err))
         };
         let data = match input.read_exact(n) {
             Ok(data) => data,
-            Err(err) => return Err(ReadError(err))
+            Err(err) => return Err(ReliableWriteError::ReadError(err))
         };
 
         hasher.input(data.as_slice());
 
         match output.write(data.as_slice()) {
             Ok(_) => (),
-            Err(err) => return Err(WriteError(err))
+            Err(err) => return Err(ReliableWriteError::WriteError(err))
         };
 
         let hash_data = match input.read_exact(hasher.output_bits() / 8) {
             Ok(data) => data,
-            Err(err) => return Err(ReadError(err))
+            Err(err) => return Err(ReliableWriteError::ReadError(err))
         };
-        // IntegrityError
         if hash_data != hasher.result_bytes() {
-            return Err(IntegrityError);
+            return Err(ReliableWriteError::IntegrityError);
         }
 
         if n == 0 {
@@ -137,11 +136,10 @@ pub fn copy_out(input: &mut Reader, output: &mut Writer) -> ReliableWriteResult<
     }
     let hash_data = match input.read_exact(hasher.output_bits() / 8) {
         Ok(data) => data,
-        Err(err) => return Err(ReadError(err))
+        Err(err) => return Err(ReliableWriteError::ReadError(err))
     };
-    // IntegrityError
     if hash_data != hasher.result_bytes() {
-        return Err(IntegrityError);
+        return Err(ReliableWriteError::IntegrityError);
     }
 
     Ok(())

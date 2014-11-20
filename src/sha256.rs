@@ -16,7 +16,7 @@
 #![allow(dead_code)]
 
 use std::iter::range_step;
-use std::num::Zero;
+use std::num::Int;
 use std::slice::bytes::{MutableByteVector, copy_memory};
 
 /// Write a u32 into a vector, which must be 4 bytes long. The value is written in big-endian
@@ -57,14 +57,14 @@ impl ToBits for u64 {
 
 /// Adds the specified number of bytes to the bit count. panic!() if this would cause numeric
 /// overflow.
-fn add_bytes_to_bits<T: Int + CheckedAdd + ToBits>(bits: T, bytes: T) -> T {
+fn add_bytes_to_bits<T: Int + ToBits>(bits: T, bytes: T) -> T {
     let (new_high_bits, new_low_bits) = bytes.to_bits();
 
-    if new_high_bits > Zero::zero() {
+    if new_high_bits > Int::zero() {
         panic!("numeric overflow occurred.")
     }
 
-    match bits.checked_add(&new_low_bits) {
+    match bits.checked_add(new_low_bits) {
         Some(x) => return x,
         None => panic!("numeric overflow occurred.")
     }
@@ -146,7 +146,7 @@ impl FixedBuffer for FixedBuffer64 {
                         self.buffer.slice_mut(self.buffer_idx, size),
                         input.slice_to(buffer_remaining));
                 self.buffer_idx = 0;
-                func(self.buffer);
+                func(self.buffer[]);
                 i += buffer_remaining;
             } else {
                 copy_memory(
