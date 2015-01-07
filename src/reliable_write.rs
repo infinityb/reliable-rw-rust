@@ -15,10 +15,7 @@ use std::io::fs::{unlink, rename};
 
 use reliable_rw::{
     copy_out,
-    IntegrityError,
-    ProtocolError,
-    ReadError,
-    WriteError
+    ReliableWriteError,
 };
 
 
@@ -54,19 +51,19 @@ fn main() {
             // is `output' flushed at this point in time?
             assert!(rename(&output_path_tmp, &output_path).is_ok())
         },
-        Err(IntegrityError) => {
+        Err(ReliableWriteError::IntegrityError) => {
             assert!(unlink(&output_path_tmp).is_ok());
             panic!("IntegrityError");
         },
-        Err(ProtocolError) => {
+        Err(ReliableWriteError::ProtocolError) => {
             assert!(unlink(&output_path_tmp).is_ok());
             panic!("ProtocolError");
         },
-        Err(ReadError(err)) => {
+        Err(ReliableWriteError::ReadError(err)) => {
             assert!(unlink(&output_path_tmp).is_ok());
             panic!("ReadError: {}", err);
         },
-        Err(WriteError(err)) => {
+        Err(ReliableWriteError::WriteError(err)) => {
             assert!(unlink(&output_path_tmp).is_ok());
             panic!("WriteError: {}", err);
         },

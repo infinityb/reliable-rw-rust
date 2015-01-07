@@ -36,12 +36,12 @@ pub type ReliableWriteResult<T> = Result<T, ReliableWriteError>;
 
 pub struct ReliableEncap<'a> {
     digest: Sha256,
-    output: &'a mut Writer+'a,
+    output: &'a mut (Writer+'a),
 }
 
 
 impl<'a> ReliableEncap<'a> {
-    pub fn new<'a>(output: &'a mut Writer) -> IoResult<ReliableEncap<'a>> {
+    pub fn new<'b>(output: &'b mut Writer) -> IoResult<ReliableEncap<'b>> {
         let rv = ReliableEncap {
             digest: Sha256::new(),
             output: output

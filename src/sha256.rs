@@ -34,7 +34,7 @@ fn read_u32v_be(dst: &mut[u32], input: &[u8]) {
     assert!(dst.len() * 4 == input.len());
     unsafe {
         let mut x = dst.as_mut_ptr() as *mut u32;
-        let mut y = input.unsafe_get(0) as *const _ as *const u32;
+        let mut y = input.get_unchecked(0) as *const _ as *const u32;
         for _ in range(0, dst.len()) {
             *x = (*y).to_be(); // 32(*y);
             x = x.offset(1);
@@ -78,7 +78,7 @@ fn add_bytes_to_bits<T: Int + ToBits>(bits: T, bytes: T) -> T {
 trait FixedBuffer {
     /// Input a vector of bytes. If the buffer becomes full, process it with the provided
     /// function and then clear the buffer.
-    fn input(&mut self, input: &[u8], func: |&[u8]|);
+    fn input<F>(&mut self, input: &[u8], F) where F: FnMut(&[u8]);
 
     /// Reset the buffer.
     fn reset(&mut self);
@@ -106,7 +106,7 @@ trait FixedBuffer {
 
 /// A FixedBuffer of 64 bytes useful for implementing Sha256 which has a 64 byte blocksize.
 struct FixedBuffer64 {
-    buffer: [u8, ..64],
+    buffer: [u8; 64],
     buffer_idx: uint,
 }
 
@@ -114,7 +114,7 @@ impl FixedBuffer64 {
     /// Create a new FixedBuffer64
     fn new() -> FixedBuffer64 {
         return FixedBuffer64 {
-            buffer: [0u8, ..64],
+            buffer: [0u8; 64],
             buffer_idx: 0
         };
     }
@@ -132,7 +132,7 @@ impl Clone for FixedBuffer64 {
 }
 
 impl FixedBuffer for FixedBuffer64 {
-    fn input(&mut self, input: &[u8], func: |&[u8]|) {
+    fn input<F>(&mut self, input: &[u8], mut func: F) where F: FnMut(&[u8]) {
         let mut i = 0;
 
         let size = self.size();
@@ -208,11 +208,11 @@ trait StandardPadding {
     /// guaranteed to have exactly rem remaining bytes when it returns. If there are not at least
     /// rem bytes available, the buffer will be zero padded, processed, cleared, and then filled
     /// with zeros again until only rem bytes are remaining.
-    fn standard_padding(&mut self, rem: uint, func: |&[u8]|);
+    fn standard_padding<F>(&mut self, rem: uint, func: F) where F: FnMut(&[u8]);
 }
 
 impl <T: FixedBuffer> StandardPadding for T {
-    fn standard_padding(&mut self, rem: uint, func: |&[u8]|) {
+    fn standard_padding<F>(&mut self, rem: uint, mut func: F) where F: FnMut(&[u8]) {
         let size = self.size();
 
         self.next(1)[0] = 128;
@@ -262,7 +262,8 @@ pub trait Digest {
     /// Convenience function that retrieves the result of a digest as a
     /// newly allocated vec of bytes.
     fn result_bytes(&mut self) -> Vec<u8> {
-        let mut buf = Vec::from_elem((self.output_bits()+7)/8, 0u8);
+        let length = (self.output_bits()+7)/8;
+        let mut buf: Vec<u8> = range(0, length).map(|&: _| 0).collect();
         self.result(buf.as_mut_slice());
         buf
     }
@@ -270,7 +271,7 @@ pub trait Digest {
 
 // A structure that represents that state of a digest computation for the SHA-2 512 family of digest
 // functions
-#[deriving(Clone)]
+#[derive(Clone)]
 struct Engine256State {
     h0: u32,
     h1: u32,
@@ -283,7 +284,7 @@ struct Engine256State {
 }
 
 impl Engine256State {
-    fn new(h: &[u32, ..8]) -> Engine256State {
+    fn new(h: &[u32; 8]) -> Engine256State {
         return Engine256State {
             h0: h[0],
             h1: h[1],
@@ -296,7 +297,7 @@ impl Engine256State {
         };
     }
 
-    fn reset(&mut self, h: &[u32, ..8]) {
+    fn reset(&mut self, h: &[u32; 8]) {
         self.h0 = h[0];
         self.h1 = h[1];
         self.h2 = h[2];
@@ -341,14 +342,14 @@ impl Engine256State {
         let mut g = self.h6;
         let mut h = self.h7;
 
-        let mut w = [0u32, ..64];
+        let mut w = [0u32; 64];
 
         // Sha-512 and Sha-256 use basically the same calculations which are implemented
         // by these macros. Inlining the calculations seems to result in better generated code.
         macro_rules! schedule_round( ($t:expr) => (
                 w[$t] = sigma1(w[$t - 2]) + w[$t - 7] + sigma0(w[$t - 15]) + w[$t - 16];
                 )
-        )
+        );
 
         macro_rules! sha2_round(
             ($A:ident, $B:ident, $C:ident, $D:ident,
@@ -359,7 +360,7 @@ impl Engine256State {
                     $H += sum0($A) + maj($A, $B, $C);
                 }
              )
-        )
+        );
 
         read_u32v_be(w.slice_mut(0, 16), data);
 
@@ -407,7 +408,7 @@ impl Engine256State {
     }
 }
 
-static K32: [u32, ..64] = [
+static K32: [u32; 64] = [
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
     0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
     0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
@@ -428,7 +429,7 @@ static K32: [u32, ..64] = [
 
 // A structure that keeps track of the state of the Sha-256 operation and contains the logic
 // necessary to perform the final calculations.
-#[deriving(Clone)]
+#[derive(Clone)]
 struct Engine256 {
     length_bits: u64,
     buffer: FixedBuffer64,
@@ -437,7 +438,7 @@ struct Engine256 {
 }
 
 impl Engine256 {
-    fn new(h: &[u32, ..8]) -> Engine256 {
+    fn new(h: &[u32; 8]) -> Engine256 {
         return Engine256 {
             length_bits: 0,
             buffer: FixedBuffer64::new(),
@@ -446,7 +447,7 @@ impl Engine256 {
         }
     }
 
-    fn reset(&mut self, h: &[u32, ..8]) {
+    fn reset(&mut self, h: &[u32; 8]) {
         self.length_bits = 0;
         self.buffer.reset();
         self.state.reset(h);
@@ -454,11 +455,11 @@ impl Engine256 {
     }
 
     fn input(&mut self, input: &[u8]) {
-        assert!(!self.finished)
+        assert!(!self.finished);
         // Assumes that input.len() can be converted to u64 without overflow
         self.length_bits = add_bytes_to_bits(self.length_bits, input.len() as u64);
         let self_state = &mut self.state;
-        self.buffer.input(input, |input: &[u8]| { self_state.process_block(input) });
+        self.buffer.input(input, |&mut: input: &[u8]| { self_state.process_block(input) });
     }
 
     fn finish(&mut self) {
@@ -467,7 +468,7 @@ impl Engine256 {
         }
 
         let self_state = &mut self.state;
-        self.buffer.standard_padding(8, |input: &[u8]| { self_state.process_block(input) });
+        self.buffer.standard_padding(8, |&mut: input: &[u8]| { self_state.process_block(input) });
         write_u32_be(self.buffer.next(4), (self.length_bits >> 32) as u32 );
         write_u32_be(self.buffer.next(4), self.length_bits as u32);
         self_state.process_block(self.buffer.full_buffer());
@@ -477,7 +478,7 @@ impl Engine256 {
 }
 
 /// The SHA-256 hash algorithm
-#[deriving(Clone)]
+#[derive(Clone)]
 pub struct Sha256 {
     engine: Engine256
 }
@@ -517,7 +518,7 @@ impl Digest for Sha256 {
     fn output_bits(&self) -> uint { 256 }
 }
 
-static H256: [u32, ..8] = [
+static H256: [u32; 8] = [
     0x6a09e667,
     0xbb67ae85,
     0x3c6ef372,

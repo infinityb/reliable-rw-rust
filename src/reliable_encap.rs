@@ -82,10 +82,10 @@ fn main() {
             // an E0001 unreachable pattern.
             Ok(n) => {
                 assert_eq!(buf.len(), n);
-                assert!(encapper.update(&buf).is_ok())
+                assert!(encapper.update(&buf).is_ok());
             },
             Err(IoError { kind: EndOfFile, .. }) => {
-                assert!(encapper.finish_write().is_ok())
+                assert!(encapper.finish_write().is_ok());
                 break;
             },
             Err(err) => panic!("{}", err)
